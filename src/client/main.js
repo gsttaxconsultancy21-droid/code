@@ -165,6 +165,15 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// Hardware Back button hook used by the Android wrapper. Returns true when handled.
+window.inklandBack = () => {
+  if (state === 'playing') pause();
+  else if (state === 'paused') resume();
+  else if (state === 'over' || state === 'how') toMenu();
+  else return false;
+  return true;
+};
+
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) pause();
 });

@@ -2,3 +2,5 @@ node_modules/
 dist/
 server/data/
 .DS_Store
+android/.tools/
+android/.build/
