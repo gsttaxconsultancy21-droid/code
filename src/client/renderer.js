@@ -1,6 +1,7 @@
-// Canvas renderer. Territory, its drop shadow and trails are each kept in a
-// one-pixel-per-cell offscreen canvas that is patched as cells change, then
-// scaled up with nearest-neighbour sampling for a crisp papercraft look.
+// Canvas renderer. Territory is traced every frame for the visible cells with
+// marching squares over cell centres, so edges are smooth vector shapes at any
+// zoom instead of pixel staircases. Trails are stroked along the exact path the
+// player drove. A one-pixel-per-cell bitmap of territory feeds the minimap.
 import { WALL } from '../engine/arena.js';
 import { colorSet } from './palette.js';
 
@@ -8,6 +9,32 @@ const FLOOR = '#f6f1e7';
 const FLOOR_LINE = 'rgba(80, 60, 30, 0.06)';
 const VOID = '#2f3150';
 const RIM = '#d8ccb6';
+const SHADE_DROP = 0.35;
+const TRAIL_WIDTH = 0.9;
+
+// Marching-squares outlines for one owner inside a quad whose corners are four
+// cell centres. Bit order: top-left 8, top-right 4, bottom-right 2, bottom-left 1.
+// Points are unit offsets: corners plus edge midpoints (which sit on cell edges).
+const TL = [0, 0], TR = [1, 0], BR = [1, 1], BL = [0, 1];
+const MT = [0.5, 0], MR = [1, 0.5], MB = [0.5, 1], ML = [0, 0.5];
+const SHAPES = [
+  null,
+  [ML, MB, BL],
+  [MB, MR, BR],
+  [ML, MR, BR, BL],
+  [MT, TR, MR],
+  [MT, TR, MR, MB, BL, ML],
+  [MT, TR, BR, MB],
+  [MT, TR, BR, BL, ML],
+  [TL, MT, ML],
+  [TL, MT, MB, BL],
+  [TL, MT, MR, BR, MB, ML],
+  [TL, MT, MR, BR, BL],
+  [TL, TR, MR, ML],
+  [TL, TR, MR, MB, BL],
+  [TL, TR, BR, MB, ML],
+  [TL, TR, BR, BL],
+];
 
 export class Renderer {
   constructor(canvas, minimap) {
@@ -45,8 +72,6 @@ export class Renderer {
       return { c, ctx, img: ctx.createImageData(s, s) };
     };
     this.terr = makeLayer();
-    this.shade = makeLayer();
-    this.trail = makeLayer();
     this.colors = [null, ...game.players.map((p) => colorSet(p.color))];
     a.trackChanges = true;
     a.changes.length = 0;
@@ -60,31 +85,115 @@ export class Renderer {
   }
 
   paintCell(i) {
-    const a = this.game.arena;
-    const o = a.owner[i];
-    const t = a.trail[i];
-    const k = i * 4;
+    const o = this.game.arena.owner[i];
     const T = this.terr.img.data;
-    const S = this.shade.img.data;
-    const R = this.trail.img.data;
+    const k = i * 4;
     if (o !== 0 && o !== WALL) {
       const cs = this.colors[o];
       T[k] = cs.base[0]; T[k + 1] = cs.base[1]; T[k + 2] = cs.base[2]; T[k + 3] = 255;
-      S[k] = cs.dark[0]; S[k + 1] = cs.dark[1]; S[k + 2] = cs.dark[2]; S[k + 3] = 255;
     } else {
       T[k + 3] = 0;
-      S[k + 3] = 0;
-    }
-    if (t !== 0) {
-      const cs = this.colors[t];
-      R[k] = cs.trail[0]; R[k + 1] = cs.trail[1]; R[k + 2] = cs.trail[2]; R[k + 3] = 215;
-    } else {
-      R[k + 3] = 0;
     }
   }
 
   flush() {
-    for (const layer of [this.terr, this.shade, this.trail]) layer.ctx.putImageData(layer.img, 0, 0);
+    this.terr.ctx.putImageData(this.terr.img, 0, 0);
+  }
+
+  // Builds one Path2D per owner covering the territory in quads [x0..x1] x [y0..y1].
+  // Fully owned quads are merged into horizontal runs; only edge quads are traced.
+  territoryPaths(x0, y0, x1, y1) {
+    const a = this.game.arena;
+    const s = a.size;
+    const own = a.owner;
+    const paths = new Map();
+    const pathFor = (id) => {
+      let p = paths.get(id);
+      if (!p) {
+        p = new Path2D();
+        paths.set(id, p);
+      }
+      return p;
+    };
+    x0 = Math.max(0, x0);
+    y0 = Math.max(0, y0);
+    x1 = Math.min(s - 2, x1);
+    y1 = Math.min(s - 2, y1);
+    const ids = [0, 0, 0, 0];
+    for (let qy = y0; qy <= y1; qy++) {
+      let runId = 0;
+      let runStart = 0;
+      for (let qx = x0; qx <= x1 + 1; qx++) {
+        let full = 0;
+        let o0 = 0, o1 = 0, o2 = 0, o3 = 0;
+        if (qx <= x1) {
+          const i = qy * s + qx;
+          o0 = own[i];
+          o1 = own[i + 1];
+          o2 = own[i + s + 1];
+          o3 = own[i + s];
+          if (o0 === o1 && o0 === o2 && o0 === o3 && o0 !== 0 && o0 !== WALL) full = o0;
+        }
+        if (full !== runId) {
+          if (runId) pathFor(runId).rect(runStart + 0.5, qy + 0.5, qx - runStart, 1);
+          runId = full;
+          runStart = qx;
+        }
+        if (full || qx > x1) continue;
+        ids[0] = o0; ids[1] = o1; ids[2] = o2; ids[3] = o3;
+        for (let k = 0; k < 4; k++) {
+          const id = ids[k];
+          if (id === 0 || id === WALL || ids.indexOf(id) !== k) continue;
+          const mask = (o0 === id ? 8 : 0) | (o1 === id ? 4 : 0) | (o2 === id ? 2 : 0) | (o3 === id ? 1 : 0);
+          const shape = SHAPES[mask];
+          const p = pathFor(id);
+          const bx = qx + 0.5;
+          const by = qy + 0.5;
+          p.moveTo(bx + shape[0][0], by + shape[0][1]);
+          for (let j = 1; j < shape.length; j++) p.lineTo(bx + shape[j][0], by + shape[j][1]);
+          p.closePath();
+        }
+      }
+    }
+    return paths;
+  }
+
+  drawTerritory(ctx, vx0, vy0, vx1, vy1) {
+    const paths = this.territoryPaths(Math.floor(vx0) - 1, Math.floor(vy0) - 2, Math.ceil(vx1), Math.ceil(vy1));
+    // A thin round-joined stroke in the fill colour softens the corners.
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 0.22;
+    ctx.save();
+    ctx.translate(0, SHADE_DROP);
+    for (const [id, path] of paths) {
+      ctx.fillStyle = ctx.strokeStyle = this.colors[id].cssDark;
+      ctx.fill(path);
+      ctx.stroke(path);
+    }
+    ctx.restore();
+    for (const [id, path] of paths) {
+      ctx.fillStyle = ctx.strokeStyle = this.colors[id].css;
+      ctx.fill(path);
+      ctx.stroke(path);
+    }
+  }
+
+  drawTrails(ctx) {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = TRAIL_WIDTH;
+    ctx.globalAlpha = 0.85;
+    for (const p of this.game.players) {
+      const path = p.path;
+      if (!p.alive || path.length < 2) continue;
+      ctx.strokeStyle = this.colors[p.id].cssTrail;
+      ctx.beginPath();
+      ctx.moveTo(path[0], path[1]);
+      for (let i = 2; i < path.length; i += 2) ctx.lineTo(path[i], path[i + 1]);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
   }
 
   targetZoom(pct) {
@@ -171,10 +280,8 @@ export class Renderer {
     ctx.stroke();
     ctx.restore();
 
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(this.shade.c, 0, 0.35);
-    ctx.drawImage(this.terr.c, 0, 0);
-    ctx.drawImage(this.trail.c, 0, 0);
+    this.drawTerritory(ctx, vx0, vy0, vx1, vy1);
+    this.drawTrails(ctx);
 
     const t = g.time;
     for (const p of g.players) if (p.alive) this.drawPlayer(ctx, p, t);

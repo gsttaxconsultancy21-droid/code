@@ -84,6 +84,8 @@ export class Game {
       alive: false,
       cell: -1,
       trail: [],
+      // Exact positions where trail cells were entered, for smooth trail drawing.
+      path: [],
       box: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
       kills: 0,
       deaths: 0,
@@ -139,6 +141,7 @@ export class Game {
     p.cell = a.index(x, y);
     p.box = { minX: x - r, minY: y - r, maxX: x + r, maxY: y + r };
     p.trail = [];
+    p.path = [];
     p.alive = true;
     p.angle = rng() * Math.PI * 2 - Math.PI;
     p.targetAngle = p.angle;
@@ -268,6 +271,7 @@ export class Game {
     } else {
       a.setTrail(c, p.id);
       p.trail.push(c);
+      p.path.push(p.x, p.y);
     }
   }
 
@@ -275,6 +279,7 @@ export class Game {
     const a = this.arena;
     const gained = a.capture(p.id, p.trail, p.box);
     p.trail = [];
+    p.path = [];
     this.events.push({ type: 'capture', player: p, gained, pct: (gained / a.playable) * 100, x: p.x, y: p.y });
     for (const q of this.players) {
       if (q !== p && q.alive && a.counts[q.id] <= 0) this.kill(q, p, 'territory');
@@ -290,6 +295,7 @@ export class Game {
     victim.countAtDeath = a.counts[victim.id];
     a.clearTrail(victim.trail, victim.id);
     victim.trail = [];
+    victim.path = [];
     a.releaseOwner(victim.id);
     if (killer && killer !== victim) killer.kills++;
     if (victim.isBot) victim.respawnAt = this.time + BOT_RESPAWN;
