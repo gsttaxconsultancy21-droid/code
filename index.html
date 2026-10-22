@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#2f3150">
+  <meta name="description" content="Inkland: an offline territory-capture arcade game.">
+  <title>Inkland</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" hidden>
+    <div class="me-card">
+      <div class="me-pct" id="hud-pct">0.0%</div>
+      <div class="me-bar"><i id="hud-bar"></i></div>
+      <div class="me-sub"><span id="hud-kills">0</span> kills · <span id="hud-time">0:00</span></div>
+    </div>
+    <ol class="board" id="hud-board"></ol>
+    <div class="feed" id="hud-feed"></div>
+    <canvas id="minimap" width="240" height="240"></canvas>
+    <div class="hud-buttons">
+      <button id="btn-pause" class="icon-btn" aria-label="Pause">❚❚</button>
+    </div>
+    <div class="banner" id="banner"></div>
+  </div>
+
+  <section id="menu" class="screen">
+    <div class="panel">
+      <h1 class="logo">INK<span>LAND</span></h1>
+      <p class="tagline">Claim the paper. Cut their trails. Own the map.</p>
+      <label class="field">
+        <span class="label">Your name</span>
+        <input id="name" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Player">
+      </label>
+      <div class="field">
+        <span class="label">Color <small id="skin-name"></small></span>
+        <div id="skins" class="skins"></div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <span class="label">Mode</span>
+          <div class="seg" id="mode">
+            <button data-v="classic">Classic</button>
+            <button data-v="rush">Time Rush</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="label">Rivals</span>
+          <div class="seg" id="difficulty">
+            <button data-v="easy">Easy</button>
+            <button data-v="normal">Normal</button>
+            <button data-v="hard">Hard</button>
+          </div>
+        </div>
+      </div>
+      <p class="mode-help" id="mode-help"></p>
+      <button id="play" class="btn primary big">PLAY</button>
+      <div class="stats" id="stats"></div>
+      <details class="hall">
+        <summary>Hall of fame</summary>
+        <ol id="scores"></ol>
+      </details>
+      <div class="menu-foot">
+        <button id="btn-mute" class="link-btn"></button>
+        <span class="offline" id="offline-badge">Works offline</span>
+      </div>
+      <p class="hint">Mouse, swipe or arrow keys to steer · Esc to pause</p>
+    </div>
+  </section>
+
+  <section id="how" class="screen overlay" hidden>
+    <div class="panel small">
+      <h2>How to play</h2>
+      <ol class="rules">
+        <li>Leave your land to draw a trail.</li>
+        <li>Get back home to claim everything inside the loop.</li>
+        <li>Touch another player's trail to knock them out.</li>
+        <li>If anyone touches <b>your</b> trail, or you cross it yourself, you're out.</li>
+      </ol>
+      <button class="btn primary" id="how-go">Got it</button>
+    </div>
+  </section>
+
+  <section id="pause" class="screen overlay" hidden>
+    <div class="panel small">
+      <h2>Paused</h2>
+      <button class="btn primary" id="resume">Resume</button>
+      <button class="btn" id="quit">Quit to menu</button>
+    </div>
+  </section>
+
+  <section id="gameover" class="screen overlay" hidden>
+    <div class="panel small">
+      <h2 id="go-title">Game over</h2>
+      <p class="go-sub" id="go-sub"></p>
+      <div class="go-grid">
+        <div><b id="go-pct">0%</b><span>best land</span></div>
+        <div><b id="go-rank">#1</b><span>rank</span></div>
+        <div><b id="go-kills">0</b><span>kills</span></div>
+        <div><b id="go-time">0:00</b><span>time</span></div>
+      </div>
+      <p class="go-best" id="go-best" hidden>New personal best!</p>
+      <p class="go-unlock" id="go-unlock" hidden></p>
+      <button class="btn primary" id="again">Play again</button>
+      <button class="btn" id="to-menu">Menu</button>
+    </div>
+  </section>
+
+  <script type="module" src="src/client/main.js"></script>
+</body>
+</html>
