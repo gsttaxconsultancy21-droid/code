@@ -10,7 +10,6 @@ Everything runs locally: no accounts, no ads, no network.
 | --- | --- | --- |
 | Single file | `npm run build`, then open `dist/inkland.html` | Double-click to play. Works from disk, USB stick or phone storage. |
 | Local server | `npm start`, then open http://localhost:8080 | Adds the shared local leaderboard. You can install it as an app (PWA) and it keeps working offline afterwards. |
-
 | Android APK | `npm run build:apk`, then install `dist/inkland.apk` | Fullscreen app for Android 7.0+. No internet permission; everything ships inside the APK. |
 
 Requires Node 18+ for the server, build and tests. There are no npm dependencies.
