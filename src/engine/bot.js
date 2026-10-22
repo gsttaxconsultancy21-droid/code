@@ -1,17 +1,37 @@
 // Bot brains: leave home, draw a loop, and race back before anyone can cut the trail.
-import { wrapAngle } from './util.js';
+// Each bot has a personality that shapes how far it roams and how it fights.
+import { clamp, wrapAngle } from './util.js';
+import { TURN_RATE, POWERUPS } from './constants.js';
 
-const PROBE_ANGLES = [0, 0.4, -0.4, 0.8, -0.8, 1.2, -1.2, 1.6, -1.6, 2.1, -2.1, 2.6, -2.6, Math.PI];
-const PROBE_DIST = [0.9, 1.8, 2.7];
+export const PERSONALITIES = {
+  // Small, safe loops; flees early.
+  farmer: { trail: [16, 32], out: [1.5, 4], side: [3, 7], caution: 7, prey: 3, hunt: 0, loot: 6 },
+  // Goes looking for exposed trails.
+  hunter: { trail: [22, 48], out: [2, 7], side: [3, 9], caution: 4, prey: 9, hunt: 22, loot: 8 },
+  // Big, greedy loops.
+  explorer: { trail: [30, 78], out: [4, 12], side: [6, 16], caution: 3, prey: 5, hunt: 0, loot: 10 },
+  // The named rival: greedy and aggressive.
+  boss: { trail: [32, 72], out: [3, 10], side: [5, 14], caution: 5, prey: 10, hunt: 26, loot: 12 },
+};
+export const BOT_KINDS = ['farmer', 'hunter', 'explorer'];
 
-export function createBrain(skill) {
+const PROBE_ANGLES = [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.8, -1.8, 2.3, -2.3, 2.8, -2.8];
+const SIM_STEPS = 8;
+const SIM_DT = 0.06;
+
+const lerp = (range, t) => range[0] + (range[1] - range[0]) * t;
+
+export function createBrain(skill, kind) {
+  const traits = PERSONALITIES[kind] || PERSONALITIES.explorer;
   return {
     skill,
+    kind,
+    traits,
     mode: 'home',
     waypoints: [],
     think: 0,
     idleUntil: 0,
-    maxTrail: Math.round(22 + skill * 55),
+    maxTrail: Math.round(lerp(traits.trail, skill)),
   };
 }
 
@@ -21,25 +41,41 @@ export function updateBot(game, p, dt) {
   if (b.think > 0) return;
   const rng = game.rng;
   const a = game.arena;
-  b.think = 0.06 + (1 - b.skill) * 0.14 + rng() * 0.04;
+  const t = b.traits;
+  b.think = 0.05 + (1 - b.skill) * 0.12 + rng() * 0.04;
 
   let target = null;
 
   if (b.mode === 'home') {
     if (game.time < b.idleUntil) return;
-    planExcursion(game, p, b);
+    const loot = nearestPowerup(game, p, t.loot * (0.5 + b.skill));
+    const prey = t.hunt && b.skill > rng() * 1.2 ? findPrey(game, p, t.hunt) : null;
+    if (loot) {
+      b.waypoints = [loot];
+      b.mode = 'out';
+    } else if (prey) {
+      b.waypoints = [prey];
+      b.mode = 'out';
+    } else {
+      planExcursion(game, p, b);
+    }
   }
 
   if (b.mode === 'out') {
     const home = p.trail.length ? pathHome(a, p) : null;
     const homeDist = home ? home.steps : 0;
-    const caution = 3 + b.skill * 6;
-    if (p.trail.length > b.maxTrail || (p.trail.length > 0 && threatDistance(game, p) < homeDist + caution)) {
+    const caution = t.caution + b.skill * 3;
+    // Turn back once the whole loop (trail so far + way home) would get too long,
+    // or when an enemy could reach the trail before we get home.
+    if (p.trail.length + homeDist > b.maxTrail || (p.trail.length && threatDistance(game, p) < homeDist + caution)) {
       b.mode = 'return';
     } else {
-      const prey = b.skill > 0.2 && p.trail.length < b.maxTrail / 2 ? findPrey(game, p, 4 + b.skill * 6) : null;
+      const prey = p.trail.length < b.maxTrail / 2 ? findPrey(game, p, t.prey * (0.5 + b.skill)) : null;
+      const loot = prey ? null : nearestPowerup(game, p, 5);
       if (prey) {
         target = prey;
+      } else if (loot) {
+        target = loot;
       } else {
         while (b.waypoints.length && Math.hypot(b.waypoints[0].x - p.x, b.waypoints[0].y - p.y) < 1.5) {
           b.waypoints.shift();
@@ -66,6 +102,7 @@ export function updateBot(game, p, dt) {
 function planExcursion(game, p, b) {
   const a = game.arena;
   const rng = game.rng;
+  const t = b.traits;
   let bestAngle = rng() * Math.PI * 2;
   let bestEdge = 0;
   let bestScore = Infinity;
@@ -80,8 +117,8 @@ function planExcursion(game, p, b) {
       bestEdge = edge;
     }
   }
-  const out = 2 + rng() * (3 + 7 * b.skill);
-  const side = 3 + rng() * (4 + 9 * b.skill);
+  const out = lerp(t.out, rng() * (0.4 + 0.6 * b.skill));
+  const side = lerp(t.side, rng() * (0.4 + 0.6 * b.skill));
   const turn = rng() < 0.5 ? 1 : -1;
   const cos = Math.cos(bestAngle);
   const sin = Math.sin(bestAngle);
@@ -105,7 +142,7 @@ function distanceToEdge(a, p, ang) {
 
 function clampToArena(a, pt) {
   const c = a.center + 0.5;
-  const lim = a.radius - 5;
+  const lim = a.activeRadius - 4;
   const dx = pt.x - c;
   const dy = pt.y - c;
   const d = Math.hypot(dx, dy);
@@ -171,11 +208,11 @@ export function pathHome(a, p, lookahead = 3) {
 }
 
 // Nearest cell owned by `p`, searched in growing square rings around the head.
-export function nearestOwned(a, p) {
+export function nearestOwned(a, p, maxRadius = a.size) {
   const hx = Math.floor(p.x);
   const hy = Math.floor(p.y);
   const s = a.size;
-  for (let r = 0; r < s; r++) {
+  for (let r = 0; r < maxRadius; r++) {
     let best = null;
     let bestD = Infinity;
     for (let dy = -r; dy <= r; dy++) {
@@ -235,10 +272,24 @@ function findPrey(game, p, radius) {
       const t = a.trail[a.index(x, y)];
       if (t === 0 || t === p.id) continue;
       const d = dx * dx + dy * dy;
-      if (d < bestD) {
-        bestD = d;
-        best = { x: x + 0.5, y: y + 0.5 };
-      }
+      if (d >= bestD) continue;
+      const victim = game.players[t - 1];
+      if (!victim || game.time < victim.shieldUntil) continue;
+      bestD = d;
+      best = { x: x + 0.5, y: y + 0.5 };
+    }
+  }
+  return best;
+}
+
+function nearestPowerup(game, p, radius) {
+  let best = null;
+  let bestD = radius;
+  for (const pu of game.powerups) {
+    const d = Math.hypot(pu.x - p.x, pu.y - p.y);
+    if (d < bestD) {
+      bestD = d;
+      best = { x: pu.x, y: pu.y };
     }
   }
   return best;
@@ -252,20 +303,27 @@ function steer(game, p, desired) {
   return desired;
 }
 
+// Simulates the next ~0.5s of movement, including the turning circle, and
+// rejects headings that would run into our own trail or the arena edge.
 function isSafe(game, p, ang) {
   const a = game.arena;
-  const cos = Math.cos(ang);
-  const sin = Math.sin(ang);
   const recent = p.trail.length - 3;
   const c = a.center + 0.5;
-  for (const d of PROBE_DIST) {
-    const px = p.x + cos * d;
-    const py = p.y + sin * d;
-    if (Math.hypot(px - c, py - c) > a.radius - 2.5) return false;
-    const x = Math.floor(px);
-    const y = Math.floor(py);
-    if (!a.isPlayable(x, y)) return false;
-    const i = a.index(x, y);
+  const lim = a.activeRadius - 2;
+  const speed = p.baseSpeed * (game.time < p.speedUntil ? POWERUPS.speed.factor : 1);
+  const maxTurn = TURN_RATE * SIM_DT;
+  let x = p.x;
+  let y = p.y;
+  let heading = p.angle;
+  for (let k = 0; k < SIM_STEPS; k++) {
+    heading += clamp(wrapAngle(ang - heading), -maxTurn, maxTurn);
+    x += Math.cos(heading) * speed * SIM_DT;
+    y += Math.sin(heading) * speed * SIM_DT;
+    if (Math.hypot(x - c, y - c) > lim) return false;
+    const cx = Math.floor(x);
+    const cy = Math.floor(y);
+    if (!a.isPlayable(cx, cy)) return false;
+    const i = a.index(cx, cy);
     if (a.trail[i] === p.id && p.trail.lastIndexOf(i) < recent) return false;
   }
   return true;

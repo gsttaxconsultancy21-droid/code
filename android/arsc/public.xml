@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Fixed resource IDs; required by the ARSCLib encoder used in build-apk. -->
+<!-- Fixed resource IDs for the SDK-free build (build-apk.sh); Gradle assigns its own. -->
 <resources>
     <public type="mipmap" name="ic_launcher" id="0x7f010000" />
     <public type="string" name="app_name" id="0x7f020000" />

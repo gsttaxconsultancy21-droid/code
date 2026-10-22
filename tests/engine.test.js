@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Arena, WALL } from '../src/engine/arena.js';
 import { Game } from '../src/engine/game.js';
 import { createRng } from '../src/engine/util.js';
+import { STEP } from '../src/engine/constants.js';
 
 function ownedCells(arena, id) {
   let n = 0;
@@ -63,7 +64,7 @@ test('capture fills the enclosed area and clears the trail', () => {
   // Interior (12..17, 12..16) must now be owned.
   for (let y = 12; y <= 16; y++) for (let x = 12; x <= 17; x++) assert.equal(a.owner[a.index(x, y)], id);
   for (const i of trail) assert.equal(a.trail[i], 0);
-  assert.ok(gained > trail.length);
+  assert.ok(gained.length > trail.length);
   // Outside the loop stays empty.
   assert.equal(a.owner[a.index(20, 20)], 0);
 });
@@ -150,4 +151,107 @@ test('a long all-bot simulation keeps territory counts consistent', () => {
     assert.ok(captures > 20, `bots should capture land (seed ${seed}: ${captures})`);
     assert.ok(deaths > 0, `bots should fight (seed ${seed})`);
   }
+});
+
+function stateHash(g) {
+  let h = 0;
+  const a = g.arena;
+  for (let i = 0; i < a.owner.length; i++) h = (h * 31 + a.owner[i] + a.trail[i] * 7) | 0;
+  for (const p of g.players) h = (h * 31 + Math.round(p.x * 1000) + Math.round(p.y * 1000) * 3 + (p.alive ? 1 : 0)) | 0;
+  return h;
+}
+
+test('replaying the same inputs reproduces the game exactly', () => {
+  const opts = { seed: 1234, mode: 'classic', difficulty: 'hard', bossLevel: 0.5 };
+  const rng = createRng(99);
+  const inputs = [];
+  const g1 = new Game(opts);
+  for (let s = 0; s < 60 * 40 && !g1.finished; s++) {
+    if (s % 20 === 0) {
+      const a = rng() * Math.PI * 2;
+      inputs.push([s, a]);
+      g1.setHumanTarget(a);
+    }
+    g1.update(STEP);
+  }
+  const g2 = new Game(opts);
+  let k = 0;
+  for (let s = 0; s < g1.steps; s++) {
+    while (k < inputs.length && inputs[k][0] === s) g2.setHumanTarget(inputs[k++][1]);
+    g2.update(STEP);
+  }
+  assert.equal(stateHash(g2), stateHash(g1));
+  assert.equal(g2.finished, g1.finished);
+});
+
+test('ink storm shrinks the arena and ends the game', () => {
+  const demo = new Game({ seed: 4, mode: 'storm', difficulty: 'easy', demo: true });
+  const startPlayable = demo.arena.playable;
+  for (let s = 0; s < 60 * 125; s++) demo.update(STEP);
+  const a = demo.arena;
+  assert.ok(a.playable < startPlayable * 0.2, 'arena should have shrunk to ~30% radius');
+  let open = 0;
+  for (let i = 0; i < a.owner.length; i++) if (a.owner[i] !== 255) open++;
+  assert.equal(open, a.playable);
+  const c = a.center + 0.5;
+  for (const p of demo.players) {
+    if (p.alive) assert.ok(Math.hypot(p.x - c, p.y - c) <= a.activeRadius);
+    assert.equal(a.counts[p.id], ownedCells(a, p.id));
+  }
+
+  const g = new Game({ seed: 4, mode: 'storm', difficulty: 'easy' });
+  for (let s = 0; s < 60 * 160 && !g.finished; s++) g.update(STEP);
+  assert.ok(g.finished);
+});
+
+test('power-ups: speed boosts, shield blocks cuts, bomb claims land', () => {
+  const g = new Game({ seed: 21, botCount: 1, radius: 40 });
+  const [h, bot] = g.players;
+  const before = g.arena.counts[h.id];
+  g.applyPowerup(h, { type: 'bomb', x: h.x, y: h.y });
+  assert.ok(g.arena.counts[h.id] > before);
+  assert.ok(g.events.some((e) => e.type === 'capture' && e.bomb));
+
+  g.applyPowerup(h, { type: 'speed', x: h.x, y: h.y });
+  assert.ok(g.isBoosted(h));
+
+  // Shielded bot trail survives being crossed.
+  g.applyPowerup(bot, { type: 'shield', x: bot.x, y: bot.y });
+  const hx = Math.floor(h.x) + 8;
+  const hy = Math.floor(h.y);
+  const cell = g.arena.index(hx, hy);
+  g.arena.owner[cell] = 0;
+  g.arena.setTrail(cell, bot.id);
+  bot.trail.push(cell, cell, cell);
+  walk(g, h, [[hx + 1, hy]]);
+  assert.equal(bot.alive, true);
+  assert.ok(g.events.some((e) => e.type === 'block'));
+});
+
+test('head-on: the shorter trail wins', () => {
+  const g = new Game({ seed: 8, botCount: 1, radius: 40 });
+  const [h, bot] = g.players;
+  h.trail = [1, 2];
+  bot.trail = [3, 4, 5, 6];
+  g.headOn(h, bot);
+  assert.equal(h.alive, true);
+  assert.equal(bot.alive, false);
+});
+
+test('multiplayer slots: humans can join, leave and respawn', () => {
+  const g = new Game({ seed: 3, noHuman: true, persistent: true, botCount: 3 });
+  assert.equal(g.human, null);
+  const a = g.addHuman({ name: 'Ana', color: 1 });
+  const b = g.addHuman({ name: 'Ben', color: 2 });
+  assert.equal(g.players.length, 5);
+  g.removePlayer(a);
+  assert.equal(a.alive, false);
+  assert.equal(g.arena.counts[a.id], 0);
+  const c = g.addHuman({ name: 'Cy', color: 3 });
+  assert.equal(c.id, a.id, 'slot reused');
+  g.kill(b, null, 'test');
+  g.respawnHuman(b);
+  assert.equal(b.alive, true);
+  for (let s = 0; s < 600; s++) g.update(STEP);
+  assert.equal(g.finished, false);
 });

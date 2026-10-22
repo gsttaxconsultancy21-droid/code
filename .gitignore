@@ -4,3 +4,7 @@ server/data/
 .DS_Store
 android/.tools/
 android/.build/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties

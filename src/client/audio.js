@@ -49,6 +49,25 @@ export class Sfx {
     this.tone(660, 0.05, { type: 'triangle', vol: 0.08 });
   }
 
+  combo(n) {
+    const base = 600 + Math.min(n, 8) * 70;
+    [0, 1, 2].forEach((i) => this.tone(base + i * 160, 0.1, { type: 'square', vol: 0.06, delay: i * 0.06 }));
+  }
+
+  powerup(kind) {
+    const f = kind === 'speed' ? 700 : kind === 'shield' ? 500 : 300;
+    this.tone(f, 0.18, { type: 'triangle', vol: 0.12, slide: f });
+  }
+
+  block() {
+    this.tone(1200, 0.08, { type: 'square', vol: 0.06 });
+    this.tone(900, 0.12, { type: 'triangle', vol: 0.07, delay: 0.05 });
+  }
+
+  warn() {
+    this.tone(880, 0.07, { type: 'square', vol: 0.05 });
+  }
+
   victory() {
     [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.22, { type: 'triangle', vol: 0.11, delay: i * 0.12 }));
   }

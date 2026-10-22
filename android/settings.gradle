@@ -1,0 +1,18 @@
+// Standard Gradle build for Play Store bundles (needs the Android SDK).
+// The SDK-free APK build is build-apk.sh in this folder.
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = 'inkland'
+include ':app'

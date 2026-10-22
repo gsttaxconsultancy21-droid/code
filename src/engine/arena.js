@@ -19,16 +19,33 @@ export class Arena {
     // Renderers switch this on to receive the indices of cells that changed.
     this.trackChanges = false;
     this.changes = [];
+    // Bumped on every territory change so renderers can cache outlines.
+    this.ownerVersion = 0;
+    // While an array, setOwner records every cell that gains an owner.
+    this.captured = null;
     this.playable = 0;
+    // The playable disc can shrink (Ink Storm). Cells are kept sorted from the
+    // rim inwards so shrinking only visits the cells it removes.
+    this.activeRadius = radius - 1;
     const limit = (radius - 1) * (radius - 1);
+    const ring = [];
     for (let y = 0; y < this.size; y++) {
       for (let x = 0; x < this.size; x++) {
         const dx = x - this.center;
         const dy = y - this.center;
-        if (dx * dx + dy * dy > limit) this.owner[y * this.size + x] = WALL;
-        else this.playable++;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > limit) {
+          this.owner[y * this.size + x] = WALL;
+        } else {
+          this.playable++;
+          ring.push([y * this.size + x, Math.sqrt(d2)]);
+        }
       }
     }
+    ring.sort((p, q) => q[1] - p[1]);
+    this.ring = Int32Array.from(ring, (r) => r[0]);
+    this.ringDist = Float32Array.from(ring, (r) => r[1]);
+    this.ringPos = 0;
   }
 
   index(x, y) {
@@ -45,7 +62,30 @@ export class Arena {
     this.counts[prev]--;
     this.counts[id]++;
     this.owner[i] = id;
+    this.ownerVersion++;
+    if (this.captured && id !== EMPTY) this.captured.push(i);
     if (this.trackChanges) this.changes.push(i);
+  }
+
+  // Turns every playable cell farther than `r` from the centre into wall.
+  // Returns the ids of players whose trail lost cells.
+  shrinkTo(r) {
+    const hits = new Set();
+    if (r >= this.activeRadius) return hits;
+    this.activeRadius = r;
+    while (this.ringPos < this.ring.length && this.ringDist[this.ringPos] > r) {
+      const i = this.ring[this.ringPos++];
+      this.counts[this.owner[i]]--;
+      this.owner[i] = WALL;
+      this.playable--;
+      this.ownerVersion++;
+      if (this.trail[i] !== EMPTY) {
+        hits.add(this.trail[i]);
+        this.trail[i] = EMPTY;
+      }
+      if (this.trackChanges) this.changes.push(i);
+    }
+    return hits;
   }
 
   setTrail(i, id) {
@@ -66,9 +106,9 @@ export class Arena {
 
   // Turns a closed trail into territory and fills every region it encloses.
   // `box` is the player's territory bounding box and is grown to include the trail.
-  // Returns the number of cells gained.
+  // Returns the list of cells gained.
   capture(id, trailCells, box) {
-    const before = this.counts[id];
+    this.captured = [];
     const s = this.size;
     for (const c of trailCells) {
       if (this.trail[c] === id) this.setTrail(c, EMPTY);
@@ -124,6 +164,8 @@ export class Arena {
         if (!visited[i] && owner[i] !== id && owner[i] !== WALL) this.setOwner(i, id);
       }
     }
-    return this.counts[id] - before;
+    const gained = this.captured;
+    this.captured = null;
+    return gained;
   }
 }

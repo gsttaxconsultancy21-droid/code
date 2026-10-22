@@ -17,35 +17,48 @@
     <div class="me-card">
       <div class="me-pct" id="hud-pct">0.0%</div>
       <div class="me-bar"><i id="hud-bar"></i></div>
-      <div class="me-sub"><span id="hud-kills">0</span> kills · <span id="hud-time">0:00</span></div>
+      <div class="me-sub"><span id="hud-kills">0</span> KOs · <span id="hud-time">0:00</span></div>
+      <div class="me-vs" id="hud-vs" hidden></div>
+      <div class="chips" id="hud-chips"></div>
     </div>
     <ol class="board" id="hud-board"></ol>
     <div class="feed" id="hud-feed"></div>
+    <div class="warn" id="hud-warn" hidden></div>
     <canvas id="minimap" width="240" height="240"></canvas>
     <div class="hud-buttons">
       <button id="btn-pause" class="icon-btn" aria-label="Pause">❚❚</button>
+    </div>
+    <div class="replay-bar" id="replay-bar" hidden>
+      <span class="rec">▶ REPLAY</span>
+      <button class="icon-btn small" id="replay-speed">1×</button>
+      <button class="icon-btn small" id="replay-exit">✕</button>
     </div>
     <div class="banner" id="banner"></div>
   </div>
 
   <section id="menu" class="screen">
-    <div class="panel">
+    <div class="panel menu-panel">
       <h1 class="logo">INK<span>LAND</span></h1>
-      <p class="tagline">Claim the paper. Cut their trails. Own the map.</p>
-      <label class="field">
-        <span class="label">Your name</span>
-        <input id="name" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Player">
-      </label>
-      <div class="field">
-        <span class="label">Color <small id="skin-name"></small></span>
-        <div id="skins" class="skins"></div>
-      </div>
-      <div class="row">
+      <nav class="tabs" id="tabs">
+        <button data-tab="play" class="on">Play</button>
+        <button data-tab="style">Style</button>
+        <button data-tab="missions">Missions <b class="star-count" id="tab-stars"></b></button>
+        <button data-tab="records">Records</button>
+        <button data-tab="settings">Settings</button>
+      </nav>
+
+      <div class="tab" data-tab="play">
+        <p class="tagline">Claim the paper. Cut their trails. Own the map.</p>
+        <label class="field">
+          <span class="label">Your name</span>
+          <input id="name" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Player">
+        </label>
         <div class="field">
           <span class="label">Mode</span>
           <div class="seg" id="mode">
             <button data-v="classic">Classic</button>
             <button data-v="rush">Time Rush</button>
+            <button data-v="storm">Ink Storm</button>
           </div>
         </div>
         <div class="field">
@@ -56,19 +69,76 @@
             <button data-v="hard">Hard</button>
           </div>
         </div>
+        <p class="mode-help" id="mode-help"></p>
+        <button id="play" class="btn primary big">PLAY</button>
+        <button id="open-mp" class="btn">📶 Play with friends (Wi-Fi)</button>
+        <p class="daily-line" id="daily-line"></p>
+        <div class="menu-foot">
+          <span class="offline">Works offline</span>
+          <span class="version">v2.0</span>
+        </div>
       </div>
-      <p class="mode-help" id="mode-help"></p>
-      <button id="play" class="btn primary big">PLAY</button>
-      <div class="stats" id="stats"></div>
-      <details class="hall">
-        <summary>Hall of fame</summary>
-        <ol id="scores"></ol>
-      </details>
-      <div class="menu-foot">
-        <button id="btn-mute" class="link-btn"></button>
-        <span class="offline" id="offline-badge">Works offline</span>
+
+      <div class="tab" data-tab="style" hidden>
+        <canvas id="preview" width="320" height="200"></canvas>
+        <div class="field">
+          <span class="label">Color <small id="skin-name"></small></span>
+          <div id="skins" class="skins"></div>
+        </div>
+        <div id="slots"></div>
+        <p class="hint">Unlock more with ★ from missions, knockouts and records.</p>
       </div>
-      <p class="hint">Mouse, swipe or arrow keys to steer · Esc to pause</p>
+
+      <div class="tab" data-tab="missions" hidden>
+        <div class="stars-total"><b id="stars-total">0</b> ★ earned</div>
+        <h3>Daily challenges <small id="daily-streak"></small></h3>
+        <ul class="missions" id="daily-list"></ul>
+        <h3>Career</h3>
+        <ul class="missions" id="career-list"></ul>
+      </div>
+
+      <div class="tab" data-tab="records" hidden>
+        <div class="stats" id="stats"></div>
+        <h3>Replays</h3>
+        <div class="replays" id="replays"></div>
+        <h3>Hall of fame</h3>
+        <ol id="scores" class="scores"></ol>
+        <p class="src" id="scores-src"></p>
+      </div>
+
+      <div class="tab" data-tab="settings" hidden>
+        <div class="settings">
+          <label class="toggle"><input type="checkbox" data-set="sound"><span>Sound</span></label>
+          <label class="toggle"><input type="checkbox" data-set="haptics"><span>Vibration</span></label>
+          <label class="toggle"><input type="checkbox" data-set="powerups"><span>Power-ups</span></label>
+          <label class="toggle"><input type="checkbox" data-set="ghost"><span>Race the ghost of your best run</span></label>
+          <label class="toggle"><input type="checkbox" data-set="leftHanded"><span>Left-handed layout</span></label>
+          <label class="toggle"><input type="checkbox" data-set="lowGraphics"><span>Low graphics (older phones)</span></label>
+          <div class="field">
+            <span class="label">Joystick sensitivity</span>
+            <div class="seg" id="sensitivity">
+              <button data-v="low">Low</button>
+              <button data-v="normal">Normal</button>
+              <button data-v="high">High</button>
+            </div>
+          </div>
+          <button class="btn" id="show-help">How to play</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="mp" class="screen overlay" hidden>
+    <div class="panel small">
+      <h2>Play with friends</h2>
+      <p class="mp-help">One person runs <code>npm start</code> on a computer. Everyone on the same Wi-Fi joins its address, shown when the server starts.</p>
+      <label class="field">
+        <span class="label">Server address</span>
+        <input id="mp-address" placeholder="192.168.1.20:8080" autocomplete="off" spellcheck="false">
+      </label>
+      <p class="mp-status" id="mp-status"></p>
+      <button class="btn primary" id="mp-join">Join game</button>
+      <button class="btn" id="mp-cancel">Back</button>
     </div>
   </section>
 
@@ -80,6 +150,8 @@
         <li>Get back home to claim everything inside the loop.</li>
         <li>Touch another player's trail to knock them out.</li>
         <li>If anyone touches <b>your</b> trail, or you cross it yourself, you're out.</li>
+        <li>Head-on crash? The shorter trail wins.</li>
+        <li>Power-ups: ⚡ speed, 🛡 shield for your trail, 💣 instant land.</li>
       </ol>
       <button class="btn primary" id="how-go">Got it</button>
     </div>
@@ -100,12 +172,14 @@
       <div class="go-grid">
         <div><b id="go-pct">0%</b><span>best land</span></div>
         <div><b id="go-rank">#1</b><span>rank</span></div>
-        <div><b id="go-kills">0</b><span>kills</span></div>
+        <div><b id="go-kills">0</b><span>knockouts</span></div>
         <div><b id="go-time">0:00</b><span>time</span></div>
       </div>
       <p class="go-best" id="go-best" hidden>New personal best!</p>
+      <ul class="go-missions" id="go-missions"></ul>
       <p class="go-unlock" id="go-unlock" hidden></p>
       <button class="btn primary" id="again">Play again</button>
+      <button class="btn" id="watch">▶ Watch replay</button>
       <button class="btn" id="to-menu">Menu</button>
     </div>
   </section>

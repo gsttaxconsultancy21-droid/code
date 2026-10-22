@@ -128,7 +128,8 @@ canvas#game {
   text-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
   opacity: 0;
   transition: opacity 0.25s, transform 0.25s;
-  white-space: nowrap;
+  width: max-content;
+  max-width: 92vw;
   text-align: center;
 }
 .banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -272,4 +273,125 @@ input#name:focus { border-color: var(--accent); }
   #minimap { width: 92px; height: 92px; }
   .feed { top: 100px; font-size: 12px; }
   .panel { padding: 20px 16px 14px; }
+}
+
+/* ---------- v2: tabs, style, missions, settings ---------- */
+.menu-panel { max-width: 460px; }
+.tabs { display: flex; gap: 4px; background: #efe9dd; border-radius: 14px; padding: 4px; margin: 12px 0 14px; overflow-x: auto; }
+.tabs button {
+  flex: 1 0 auto;
+  border: 0;
+  background: transparent;
+  padding: 8px 8px;
+  border-radius: 10px;
+  font: 800 13px var(--font);
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tabs button.on { background: white; color: var(--ink); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.12); }
+.star-count { color: #f59f00; }
+.tab h3 { margin: 16px 0 8px; font-size: 15px; }
+.tab h3 small { color: var(--muted); font-weight: 700; }
+
+#preview { display: block; width: 100%; max-width: 320px; height: auto; margin: 0 auto 8px; background: #f6f2ea; border-radius: 16px; }
+.slot { margin-bottom: 10px; }
+.chips-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  border: 2px solid #e7e1d5;
+  background: white;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font: 800 13px var(--font);
+  color: var(--ink);
+  cursor: pointer;
+}
+.chip.sel { border-color: var(--ink); background: var(--ink); color: white; }
+.chip.locked { opacity: 0.5; cursor: not-allowed; }
+.chip.locked::before { content: "🔒 "; }
+
+.stars-total { text-align: center; font-weight: 800; color: var(--muted); }
+.stars-total b { font-size: 34px; color: #f59f00; }
+.missions { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.missions li { background: #f6f2ea; border-radius: 12px; padding: 8px 12px; font-weight: 700; display: flex; gap: 8px; align-items: center; }
+.missions li .txt { flex: 1; }
+.missions li .prog { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.missions li.done { background: #ebfbee; color: #2b8a3e; }
+.missions li .st { color: #f59f00; white-space: nowrap; }
+.daily-line { text-align: center; color: var(--muted); font-weight: 700; font-size: 13px; margin: 10px 0 0; }
+
+.replays { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.replays .btn { margin: 0; font-size: 14px; padding: 10px 6px; }
+.replays .btn:disabled { opacity: 0.45; cursor: default; }
+.scores { margin: 0; padding-left: 22px; max-height: 200px; overflow-y: auto; font-size: 14px; }
+.scores li { padding: 2px 0; }
+.scores li span { float: right; color: var(--muted); font-weight: 700; }
+.src { font-size: 11px; color: var(--muted); margin: 4px 0 0; }
+
+.settings { display: flex; flex-direction: column; gap: 4px; }
+.toggle { display: flex; align-items: center; gap: 10px; padding: 9px 4px; font-weight: 800; cursor: pointer; border-bottom: 1px solid #f0ebe1; }
+.toggle input { appearance: none; width: 44px; height: 26px; border-radius: 13px; background: #ddd5c5; position: relative; flex: none; cursor: pointer; transition: background 0.15s; }
+.toggle input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: white; transition: left 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+.toggle input:checked { background: var(--accent); }
+.toggle input:checked::after { left: 21px; }
+.settings .field { margin-top: 10px; }
+
+.mp-help { color: var(--muted); font-weight: 700; font-size: 14px; text-align: left; }
+.mp-help code { background: #f1ece2; padding: 1px 5px; border-radius: 5px; }
+#mp-address { width: 100%; padding: 12px 14px; border: 3px solid #e7e1d5; border-radius: 14px; font: 800 17px var(--font); -webkit-user-select: text; user-select: text; outline: none; }
+#mp-address:focus { border-color: var(--accent); }
+.mp-status { min-height: 1.2em; font-weight: 800; color: #e8590c; margin: 4px 0 0; }
+
+/* HUD additions */
+.me-vs { font-size: 12px; font-weight: 800; margin-top: 4px; }
+.me-vs.up { color: #2b8a3e; }
+.me-vs.down { color: #c92a2a; }
+.chips { display: flex; gap: 4px; margin-top: 6px; }
+.chips:empty { display: none; }
+.chips span { background: #26263a; color: white; border-radius: 8px; padding: 2px 7px; font-size: 12px; font-weight: 800; }
+.warn {
+  position: absolute;
+  left: 50%;
+  bottom: max(90px, calc(env(safe-area-inset-bottom) + 80px));
+  transform: translateX(-50%);
+  background: rgba(255, 59, 59, 0.92);
+  color: white;
+  font-weight: 900;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 15px;
+  white-space: nowrap;
+  animation: warn-pulse 0.6s infinite alternate;
+}
+.warn.soft { background: rgba(38, 38, 58, 0.8); animation: none; }
+@keyframes warn-pulse { to { transform: translateX(-50%) scale(1.06); } }
+.replay-bar {
+  position: absolute;
+  left: 50%;
+  top: max(12px, env(safe-area-inset-top));
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  pointer-events: auto;
+  background: rgba(38, 38, 58, 0.7);
+  padding: 5px 6px 5px 12px;
+  border-radius: 14px;
+}
+.replay-bar .rec { color: #ff8787; font-weight: 900; font-size: 13px; letter-spacing: 1px; }
+.icon-btn.small { width: 36px; height: 32px; font-size: 13px; border-radius: 10px; }
+.go-missions { list-style: none; padding: 0; margin: 10px 0 0; text-align: left; }
+.go-missions li { background: #fff9db; border-radius: 10px; padding: 6px 10px; margin-bottom: 4px; font-weight: 800; font-size: 14px; }
+.go-missions li b { color: #f59f00; float: right; }
+
+/* Left-handed: controls and minimap swap sides. */
+body.lefty #minimap { right: auto; left: 12px; }
+body.lefty .hud-buttons { left: auto; right: 12px; }
+body.lefty .board { right: auto; left: 12px; top: 150px; }
+body.lefty .me-card { left: auto; right: 12px; }
+body.lefty .feed { left: auto; right: 12px; align-items: flex-end; }
+
+@media (max-width: 520px) {
+  .tabs button { font-size: 12px; padding: 7px 6px; }
+  body.lefty .board { top: 125px; }
 }

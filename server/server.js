@@ -3,7 +3,10 @@
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { acceptWebSocket } from './ws.js';
+import { Room } from './room.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_DIR = process.env.INKLAND_DATA || path.join(ROOT, 'server', 'data');
@@ -153,8 +156,8 @@ async function handleStatic(req, res, url) {
   }
 }
 
-export function createServer() {
-  return http.createServer(async (req, res) => {
+export function createServer(room = new Room()) {
+  const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     try {
       if (url.pathname.startsWith('/api/')) await handleApi(req, res, url);
@@ -164,6 +167,26 @@ export function createServer() {
       if (!res.headersSent) send(res, 500, { error: 'Server error' });
     }
   });
+  // Same-Wi-Fi multiplayer: one shared room on /ws.
+  server.on('upgrade', (req, socket) => {
+    if (new URL(req.url, 'http://localhost').pathname !== '/ws') {
+      socket.end('HTTP/1.1 404 Not Found\r\n\r\n');
+      return;
+    }
+    const conn = acceptWebSocket(req, socket);
+    if (conn) room.connect(conn);
+  });
+  server.room = room;
+  server.on('close', () => room.stop());
+  return server;
+}
+
+export function lanAddresses() {
+  const out = [];
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const net of list || []) if (net.family === 'IPv4' && !net.internal) out.push(net.address);
+  }
+  return out;
 }
 
 export async function start(port = PORT, host = HOST) {
@@ -177,5 +200,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   start().then((server) => {
     const { port } = server.address();
     console.log(`Inkland running at http://localhost:${port}  (Ctrl+C to stop)`);
+    for (const ip of lanAddresses()) console.log(`  Friends on the same Wi-Fi: http://${ip}:${port}  (or join ${ip}:${port} in the app)`);
   });
 }

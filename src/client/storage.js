@@ -1,6 +1,7 @@
 // Saves live in localStorage so the game works fully offline. When the page is
 // served by the bundled local server, scores are also mirrored to its API.
 const SAVE_KEY = 'inkland.save.v1';
+const REPLAY_KEY = 'inkland.replays.v1';
 const MAX_SCORES = 20;
 
 function defaultSave() {
@@ -10,7 +11,20 @@ function defaultSave() {
     mode: 'classic',
     difficulty: 'normal',
     muted: false,
-    stats: { best: 0, kills: 0, games: 0, wins: 0, timePlayed: 0 },
+    seenHelp: false,
+    look: { pattern: 'plain', trail: 'plain', hat: 'none', face: 'classic' },
+    settings: {
+      sensitivity: 'normal',
+      leftHanded: false,
+      lowGraphics: false,
+      haptics: true,
+      ghost: true,
+      powerups: true,
+    },
+    stats: { best: 0, kills: 0, games: 0, wins: 0, timePlayed: 0, bossKills: 0 },
+    stars: 0,
+    missions: { career: {}, daily: null, streak: 0, lastFullDay: null },
+    serverUrl: '',
     scores: [],
   };
 }
@@ -21,7 +35,10 @@ export function loadSave() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (raw) {
       const data = JSON.parse(raw);
-      Object.assign(save, data, { stats: { ...save.stats, ...(data.stats || {}) } });
+      for (const key of ['look', 'settings', 'stats', 'missions']) {
+        data[key] = { ...save[key], ...(data[key] || {}) };
+      }
+      Object.assign(save, data);
       if (!Array.isArray(save.scores)) save.scores = [];
     }
   } catch {
@@ -38,13 +55,38 @@ export function writeSave(save) {
   }
 }
 
+// Replays are kept apart from the save because they are much larger.
+export function loadReplays() {
+  try {
+    const data = JSON.parse(localStorage.getItem(REPLAY_KEY) || 'null');
+    if (data && typeof data === 'object') return { last: data.last || null, best: data.best || {} };
+  } catch {
+    // ignore
+  }
+  return { last: null, best: {} };
+}
+
+export function writeReplays(replays) {
+  try {
+    localStorage.setItem(REPLAY_KEY, JSON.stringify(replays));
+  } catch {
+    // Quota exceeded: keep only the best runs.
+    try {
+      localStorage.setItem(REPLAY_KEY, JSON.stringify({ last: null, best: replays.best }));
+    } catch {
+      // give up silently
+    }
+  }
+}
+
 // Folds a finished game into the save. Returns { newBest, entry }.
-export function recordGame(save, result) {
+export function recordGame(save, result, extra = {}) {
   const st = save.stats;
   const score = Math.round(result.peakPct * 100) / 100;
   const newBest = score > st.best;
   st.games++;
   st.kills += result.kills;
+  st.bossKills += extra.bossKills || 0;
   st.timePlayed += Math.round(result.time);
   if (result.won) st.wins++;
   if (newBest) st.best = score;
@@ -60,6 +102,11 @@ export function recordGame(save, result) {
   save.scores.sort((a, b) => b.score - a.score);
   save.scores.length = Math.min(save.scores.length, MAX_SCORES);
   return { newBest, entry };
+}
+
+// Everything cosmetics can be unlocked by.
+export function progressOf(save) {
+  return { ...save.stats, stars: save.stars };
 }
 
 async function request(path, options = {}) {

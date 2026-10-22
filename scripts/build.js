@@ -8,14 +8,19 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODULES = [
   'src/engine/util.js',
+  'src/engine/constants.js',
   'src/engine/arena.js',
   'src/engine/bot.js',
   'src/engine/game.js',
   'src/client/palette.js',
   'src/client/storage.js',
+  'src/client/missions.js',
+  'src/client/replay.js',
+  'src/client/haptics.js',
   'src/client/audio.js',
   'src/client/input.js',
   'src/client/renderer.js',
+  'src/client/net.js',
   'src/client/ui.js',
   'src/client/main.js',
 ];
@@ -25,10 +30,14 @@ const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const js = MODULES.map((file) => {
   const src = read(file)
     .replace(/^import\s[^;]*;\s*$/gm, '')
-    .replace(/^export\s+(?=(const|let|function|class|async)\b)/gm, '');
+    .replace(/^export\s+(?=(const|let|function|class|async)\b)/gm, '')
+    .replace(/^export\s*\{[^}]*\};?\s*$/gm, '');
   if (/^\s*(import|export)\b/m.test(src)) throw new Error(`Unsupported module syntax left in ${file}`);
   return `// ---- ${file} ----\n${src}`;
 }).join('\n');
+
+// Fail the build on syntax errors (e.g. two modules declaring the same name).
+new Function(js); // eslint-disable-line no-new-func
 
 const icon = `data:image/svg+xml;base64,${Buffer.from(read('icon.svg')).toString('base64')}`;
 let html = read('index.html')

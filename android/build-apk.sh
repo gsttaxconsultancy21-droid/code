@@ -72,6 +72,8 @@ MOD="$WORK/module"
 mkdir -p "$MOD/resources/package_1" "$MOD/root/assets"
 cp "$HERE/AndroidManifest.xml" "$MOD/"
 cp -r "$HERE/res" "$MOD/resources/package_1/"
+# ARSCLib needs fixed resource IDs; Gradle builds assign their own.
+cp "$HERE/arsc/public.xml" "$MOD/resources/package_1/res/values/public.xml"
 echo '{"package_id":127,"package_name":"com.inkland.game"}' > "$MOD/resources/package_1/package.json"
 cp "$ROOT/dist/inkland.html" "$MOD/root/assets/index.html"
 cp "$WORK/classes.dex" "$MOD/root/"

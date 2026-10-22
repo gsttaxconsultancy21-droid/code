@@ -1,5 +1,5 @@
 // Network-first service worker: always fresh when online, fully playable offline.
-const CACHE = 'inkland-v1';
+const CACHE = 'inkland-v2';
 const SHELL = [
   './',
   'index.html',
@@ -7,14 +7,19 @@ const SHELL = [
   'manifest.webmanifest',
   'icon.svg',
   'src/engine/util.js',
+  'src/engine/constants.js',
   'src/engine/arena.js',
   'src/engine/bot.js',
   'src/engine/game.js',
   'src/client/palette.js',
   'src/client/storage.js',
+  'src/client/missions.js',
+  'src/client/replay.js',
+  'src/client/haptics.js',
   'src/client/audio.js',
   'src/client/input.js',
   'src/client/renderer.js',
+  'src/client/net.js',
   'src/client/ui.js',
   'src/client/main.js',
 ];

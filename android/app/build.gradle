@@ -1,0 +1,70 @@
+// Shares the activity, resources and bundled game with build-apk.sh.
+// Release signing comes from the same environment variables:
+//   INKLAND_KEYSTORE, INKLAND_KEYSTORE_PASS, INKLAND_KEY_ALIAS (PKCS12).
+plugins {
+    id 'com.android.application'
+}
+
+def keystorePath = System.getenv('INKLAND_KEYSTORE')
+
+android {
+    namespace 'com.inkland.game'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.inkland.game'
+        minSdk 24
+        targetSdk 35
+        versionCode 2
+        versionName '2.0.0'
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storeType 'pkcs12'
+                storePassword System.getenv('INKLAND_KEYSTORE_PASS')
+                keyAlias System.getenv('INKLAND_KEY_ALIAS') ?: 'inkland'
+                keyPassword System.getenv('INKLAND_KEYSTORE_PASS')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (keystorePath) signingConfig signingConfigs.release
+        }
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'src/main/AndroidManifest.xml'
+            java.srcDirs = ['../src']
+            res.srcDirs = ['../res']
+            assets.srcDirs = [layout.buildDirectory.dir('generated/inkland-assets').get().asFile]
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+// Bundle the web game (node scripts/build.js) and ship it as assets/index.html.
+def bundleGame = tasks.register('bundleGame', Exec) {
+    workingDir rootProject.file('..')
+    commandLine 'node', 'scripts/build.js'
+}
+def copyGameAssets = tasks.register('copyGameAssets', Copy) {
+    dependsOn bundleGame
+    from(rootProject.file('../dist/inkland.html')) {
+        rename { 'index.html' }
+    }
+    into layout.buildDirectory.dir('generated/inkland-assets')
+}
+tasks.named('preBuild') {
+    dependsOn copyGameAssets
+}

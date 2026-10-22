@@ -6,7 +6,12 @@ const KEY_DIRS = {
   ArrowLeft: [-1, 0], KeyA: [-1, 0],
   ArrowRight: [1, 0], KeyD: [1, 0],
 };
-const STICK_RADIUS = 60;
+// Joystick travel and dead zone per sensitivity setting (pixels).
+const SENSITIVITY = {
+  low: { radius: 90, dead: 14 },
+  normal: { radius: 60, dead: 10 },
+  high: { radius: 38, dead: 6 },
+};
 
 export class Input {
   constructor(surface) {
@@ -16,6 +21,7 @@ export class Input {
     this.keys = new Set();
     this.onPause = null;
     this.onFirstInput = null;
+    this.stickCfg = SENSITIVITY.normal;
 
     surface.addEventListener('pointerdown', (e) => this.down(e));
     window.addEventListener('pointermove', (e) => this.move(e));
@@ -24,6 +30,10 @@ export class Input {
     window.addEventListener('keydown', (e) => this.key(e, true));
     window.addEventListener('keyup', (e) => this.key(e, false));
     window.addEventListener('blur', () => this.keys.clear());
+  }
+
+  setSensitivity(level) {
+    this.stickCfg = SENSITIVITY[level] || SENSITIVITY.normal;
   }
 
   reset() {
@@ -60,10 +70,11 @@ export class Input {
     let dx = s.x - s.ox;
     let dy = s.y - s.oy;
     const len = Math.hypot(dx, dy);
-    if (len > 10) this.angle = Math.atan2(dy, dx);
-    if (len > STICK_RADIUS) {
-      s.ox = s.x - (dx / len) * STICK_RADIUS;
-      s.oy = s.y - (dy / len) * STICK_RADIUS;
+    const { radius, dead } = this.stickCfg;
+    if (len > dead) this.angle = Math.atan2(dy, dx);
+    if (len > radius) {
+      s.ox = s.x - (dx / len) * radius;
+      s.oy = s.y - (dy / len) * radius;
     }
   }
 
